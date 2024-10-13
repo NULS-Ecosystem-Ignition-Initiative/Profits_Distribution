@@ -14,13 +14,10 @@ import static io.nuls.contract.sdk.Utils.emit;
 import static io.nuls.contract.sdk.Utils.require;
 
 /**
- * @title   Nuls Oracles Revenue Distribution Contract
+ * @title   Shareholders Profit Distribution Contract
  *
- * @dev     Allows for users to deposit Nuls Oracle Tokens (ORA)
- *          and earn revenue from the Nuls Oracles Project.
- *          After deposited users will no longer be able to
- *          withdraw the tokens, meanign that by depositing
- *          they are burning their tokens.
+ * @dev     Receives profits from opertions and
+ *          distributes them through shareholders
  *
  * @author  Pedro G. S. Ferreira
  *
@@ -34,6 +31,7 @@ public class Profits implements Contract{
     private Address     rewardDistribution;                    // Address that manages Contract admin functions
     private boolean     locked          = false;               // Prevent Reentrancy Attacks
     private BigInteger  allTimeRewards  = BigInteger.ZERO;     // All time Distributed Profits
+    private boolean initialized;                               // Checks if contract is initialized
 
     private Map<Address, BigInteger>    allTimeRewardsPerUser  = new HashMap<Address, BigInteger>();    // All Time Profits Earned by Shareholders
     private Map<Address, Boolean>       shareholder            = new HashMap<Address, Boolean>();       // Approved Shareholders
@@ -48,16 +46,21 @@ public class Profits implements Contract{
         rewardDistribution  = Msg.sender();
     }
 
-    /*
+    /**
     *
     *
-    *
+    * @param shareholders_ An Array with the shareholders Addresses
     */
     public void initialize(String[] shareholders_){
+
+        require(!initialized, "Already Initialized");
+        onlyRewardDistribution();
+
         for(int i = 0; i < shareholders_.length; i++) {
             shareholder.put(new Address(shareholders_[i]), true);
             shareholdersList.add(new Address(shareholders_[i]));
         }
+
     }
 
     /*===========================================
@@ -86,8 +89,6 @@ public class Profits implements Contract{
         return locked;
     }
 
-
-
     /**
      *  Returns all time rewards in Nuls
      *
@@ -100,16 +101,21 @@ public class Profits implements Contract{
 
 
     /**
-     * Returns Nuls Oracle Tokens (ORA) balance
+     * Returns Contract Nuls Balance
      *
-     * @param account User address
-     * @return User Nuls Oracle Tokens (ORA) balance
+     * @return contract Nuls Balance
      */
     @View
     public BigInteger _balanceOf() {
         return Msg.address().balance();
     }
 
+    /**
+     * Returns All time Shareholder profits
+     *
+     * @param account User address
+     * @return all time Shareholder profits
+     */
     @View
     public BigInteger getShareholdersProfits(Address account) {
         if(allTimeRewardsPerUser.get(account) == null){
@@ -163,8 +169,9 @@ public class Profits implements Contract{
      *
      * @param amount Amount of ORA Tokens to deposit
      */
-    @Payable
     public void profitDistribution(BigInteger amount) {
+
+        require(initialized, "Not yet initialized");
 
         // Prevent Reentrancy Attacks
         nonReentrant();
@@ -179,11 +186,9 @@ public class Profits implements Contract{
 
                 shareholdersList.get(i).transfer(individualProfits);
 
-                if(allTimeRewardsPerUser.get(i) == null){
-                    allTimeRewardsPerUser.put(shareholdersList.get(i), individualProfits);
-                }else{
-                    allTimeRewardsPerUser.put(shareholdersList.get(i), allTimeRewardsPerUser.get(i).add(individualProfits));
-                }
+                BigInteger userAllTime = (allTimeRewardsPerUser.get(i) == null) ? BigInteger.ZERO : allTimeRewardsPerUser.get(i);
+
+                allTimeRewardsPerUser.put(shareholdersList.get(i), userAllTime.add(individualProfits));
 
                 // Emit event with the Stake event
                 emit(new RewardPaid(shareholdersList.get(i), individualProfits));
@@ -196,15 +201,12 @@ public class Profits implements Contract{
         closeReentrant();
     }
 
-    public void removeShareholder(Address admin_) {
 
-        require(shareholder.get(admin_) != null, "Not Shareholder");
-        require(shareholder.get(admin_), "Not Shareholder");
-
-        shareholder.put(admin_, false);
-        shareholdersList.remove(admin_);
-    }
-
+    /**
+     *  Add Shareholder Address
+     *
+     * @param admin_ Shareholder Address
+     */
     public void addShareholder(Address admin_) {
 
         require(shareholder.get(admin_) != null, "Invalid Shareholder");
@@ -212,6 +214,20 @@ public class Profits implements Contract{
 
         shareholder.put(admin_, true);
         shareholdersList.add(admin_);
+    }
+
+    /**
+     *  Remove Shareholder Address
+     *
+     * @param admin_ Shareholder Address
+     */
+    public void removeShareholder(Address admin_) {
+
+        require(shareholder.get(admin_) != null, "Not Shareholder");
+        require(shareholder.get(admin_), "Not Shareholder");
+
+        shareholder.put(admin_, false);
+        shareholdersList.remove(admin_);
     }
 
 
