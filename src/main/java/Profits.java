@@ -44,6 +44,7 @@ public class Profits implements Contract{
      * */
     public Profits() {
         rewardDistribution  = Msg.sender();
+        initialized = false;
     }
 
     /**
@@ -57,9 +58,12 @@ public class Profits implements Contract{
         onlyRewardDistribution();
 
         for(int i = 0; i < shareholders_.length; i++) {
+            require(new Address(shareholders_[i]) != null, "Invalid Shareholder");
             shareholder.put(new Address(shareholders_[i]), true);
             shareholdersList.add(new Address(shareholders_[i]));
         }
+
+        initialized = true;
 
     }
 
@@ -90,12 +94,22 @@ public class Profits implements Contract{
     }
 
     /**
+     * Returns the number of shareholders
+     *
+     * @return the number of shareholders
+     */
+    @View
+    public int getNumberOfShareholders(){
+        return shareholdersList.size();
+    }
+
+    /**
      *  Returns all time rewards in Nuls
      *
      * @return all time rewards in Nuls
      */
     @View
-    public BigInteger allTimeEarned(Address account) {
+    public BigInteger allTimeEarned() {
         return allTimeRewards;
     }
 
@@ -164,12 +178,9 @@ public class Profits implements Contract{
     public void _payable() {}
 
     /**
-     *  Deposits Nuls Oracle Tokens (ORA) in the Contract
-     *  and updated user balances
-     *
-     * @param amount Amount of ORA Tokens to deposit
+     *  Distributes accumulated profits through holders
      */
-    public void profitDistribution(BigInteger amount) {
+    public void profitDistribution() {
 
         require(initialized, "Not yet initialized");
 
@@ -209,8 +220,9 @@ public class Profits implements Contract{
      */
     public void addShareholder(Address admin_) {
 
-        require(shareholder.get(admin_) != null, "Invalid Shareholder");
-        require(!shareholder.get(admin_), "Already Shareholder");
+        onlyRewardDistribution();
+
+        require(admin_ != null, "Invalid Shareholder");
 
         shareholder.put(admin_, true);
         shareholdersList.add(admin_);
@@ -223,7 +235,8 @@ public class Profits implements Contract{
      */
     public void removeShareholder(Address admin_) {
 
-        require(shareholder.get(admin_) != null, "Not Shareholder");
+        onlyRewardDistribution();
+
         require(shareholder.get(admin_), "Not Shareholder");
 
         shareholder.put(admin_, false);
@@ -244,6 +257,7 @@ public class Profits implements Contract{
      */
     public void setRewardDistribution(Address _rewardDistribution) {
         onlyRewardDistribution();
+        require(_rewardDistribution != null, "Reward Distribution not valid");
         rewardDistribution = _rewardDistribution;
     }
 
